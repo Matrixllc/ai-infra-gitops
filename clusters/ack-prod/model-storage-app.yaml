@@ -1,0 +1,25 @@
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: model-storage
+  namespace: argocd
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Matrixllc/ai-infra-gitops.git
+    targetRevision: main
+    path: infrastructure/storage
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-infra
+
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
