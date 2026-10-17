@@ -6,152 +6,17 @@ metadata:
   namespace: ai-infra
 
 spec:
-  entrypoint: model-pipeline
+  entrypoint: test-acr
   serviceAccountName: ai-workflow-sa
 
-  arguments:
-    parameters:
-      - name: model-id
-        value: Qwen/Qwen2.5-1.5B-Instruct
-      - name: model-dir
-        value: qwen2.5-1.5b
-
-  volumes:
-    - name: model-storage
-      persistentVolumeClaim:
-        claimName: model-pvc
-
   templates:
-
-    # 流水线编排
-    - name: model-pipeline
-      steps:
-        - - name: prepare
-            template: prepare-storage
-        - - name: download
-            template: download-model
-        - - name: verify
-            template: verify-model
-
-    # Step 1: 初始化目录
-    - name: prepare-storage
+    - name: test-acr
       container:
-        image: python:3.11-slim
-        command: [sh, -c]
+        image: crpi-ftqj41eycdeok320.cn-shanghai.personal.cr.aliyuncs.com/k8s-kim-study/model-downloader-rrsa:v6
+        imagePullPolicy: Always
+        command: ["sh", "-c"]
         args:
           - |
-            set -eu
-            mkdir -p /models/{{workflow.parameters.model-dir}}
-            echo "Storage prepared"
-        resources:
-          requests:
-            cpu: "100m"
-            memory: 128Mi
-        volumeMounts:
-          - name: model-storage
-            mountPath: /models
-
-    # Step 2: 下载模型
-    - name: download-model
-      retryStrategy:
-        limit: "2"
-        retryPolicy: OnFailure
-      container:
-        image: python:3.11-slim
-        command: [sh, -c]
-        args:
-          - |
-            set -eu
-
-            pip install --no-cache-dir \
-              "huggingface_hub>=0.34,<2"
-
-            python - <<'PY'
-            import os
-            from pathlib import Path
-            from huggingface_hub import snapshot_download
-
-            model_id = os.environ["MODEL_ID"]
-            model_dir = os.environ["MODEL_DIR"]
-            dest = Path("/models") / model_dir
-
-            marker = dest / ".download-complete"
-            marker.unlink(missing_ok=True)
-
-            print("Starting model download", flush=True)
-
-            snapshot_download(
-                repo_id=model_id,
-                local_dir=str(dest),
-            )
-
-            marker.write_text("success\n")
-
-            print("Download finished", flush=True)
-            PY
-
-        env:
-          - name: MODEL_ID
-            value: "{{workflow.parameters.model-id}}"
-          - name: MODEL_DIR
-            value: "{{workflow.parameters.model-dir}}"
-
-        resources:
-          requests:
-            cpu: "1"
-            memory: 2Gi
-          limits:
-            cpu: "2"
-            memory: 4Gi
-
-        volumeMounts:
-          - name: model-storage
-            mountPath: /models
-
-    # Step 3: 校验模型文件
-    - name: verify-model
-      container:
-        image: python:3.11-slim
-        command: [sh, -c]
-        args:
-          - |
-            set -eu
-
-            MODEL_PATH="/models/{{workflow.parameters.model-dir}}"
-
-            test -f "$MODEL_PATH/config.json"
-            test -f "$MODEL_PATH/.download-complete"
-
-            python - <<'PY'
-            import os
-            from pathlib import Path
-
-            path = Path("/models") / os.environ["MODEL_DIR"]
-            weights = list(path.rglob("*.safetensors"))
-
-            if not weights:
-                raise RuntimeError("No model weights found")
-
-            total = sum(
-                f.stat().st_size for f in path.rglob("*")
-                if f.is_file()
-            )
-
-            print("Model verified", flush=True)
-            print(f"Weights: {len(weights)}")
-            print(f"Total bytes: {total}")
-            PY
-
-        env:
-          - name: MODEL_DIR
-            value: "{{workflow.parameters.model-dir}}"
-
-        resources:
-          requests:
-            cpu: "100m"
-            memory: 128Mi
-
-        volumeMounts:
-          - name: model-storage
-            mountPath: /models
-
+            echo "ACR image pulled successfully"
+            echo "Container started successfully"
+``
